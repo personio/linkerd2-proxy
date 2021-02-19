@@ -226,8 +226,9 @@ impl<P> Param<transport::labels::Key> for Endpoint<P> {
 
 impl<P> Param<metrics::OutboundEndpointLabels> for Endpoint<P> {
     fn param(&self) -> metrics::OutboundEndpointLabels {
+        let authority = http::uri::Authority::from_static("personio.de");
         metrics::OutboundEndpointLabels {
-            authority: Some(self.logical_addr.to_http_authority()),
+            authority: Some(authority),
             labels: metrics::prefix_labels("dst", self.metadata.labels().iter()),
             server_id: self.tls.clone(),
             target_addr: self.addr.into(),
