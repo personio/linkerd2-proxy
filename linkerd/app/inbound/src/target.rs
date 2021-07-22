@@ -243,9 +243,10 @@ impl Param<transport::labels::Key> for Target {
 
 impl Param<metrics::EndpointLabels> for Target {
     fn param(&self) -> metrics::EndpointLabels {
+        let authority = http::uri::Authority::from_static("personio.de");
         metrics::InboundEndpointLabels {
             tls: self.tls.clone(),
-            authority: self.dst.name_addr().map(|d| d.as_http_authority()),
+            authority: Some(authority),
             target_addr: self.target_addr,
         }
         .into()
