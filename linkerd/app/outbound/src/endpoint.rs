@@ -107,7 +107,6 @@ impl<P> svc::Param<metrics::OutboundEndpointLabels> for Endpoint<P> {
             authority: Some(authority),
             labels: metrics::prefix_labels("dst", self.metadata.labels().iter()),
             server_id: self.tls.clone(),
-            target_addr: self.addr.into(),
         }
     }
 }

@@ -303,7 +303,6 @@ impl Param<metrics::EndpointLabels> for Logical {
         metrics::InboundEndpointLabels {
             tls: self.tls.clone(),
             authority: Some(authority),
-            target_addr: self.addr.into(),
         }
         .into()
     }
