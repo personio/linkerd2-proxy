@@ -103,9 +103,14 @@ impl<P> svc::Param<transport::labels::Key> for Endpoint<P> {
 impl<P> svc::Param<metrics::OutboundEndpointLabels> for Endpoint<P> {
     fn param(&self) -> metrics::OutboundEndpointLabels {
         let authority = http::uri::Authority::from_static("personio.de");
+
+        let mut dst_labels = self.metadata.labels().clone();
+        dst_labels.remove("pod");
+        dst_labels.remove("pod_template_hash");
+
         metrics::OutboundEndpointLabels {
             authority: Some(authority),
-            labels: metrics::prefix_labels("dst", self.metadata.labels().iter()),
+            labels: metrics::prefix_labels("dst", dst_labels.iter()),
             server_id: self.tls.clone(),
         }
     }
