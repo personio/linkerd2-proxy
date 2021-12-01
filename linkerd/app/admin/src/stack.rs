@@ -178,7 +178,6 @@ impl Param<metrics::EndpointLabels> for Http {
         metrics::InboundEndpointLabels {
             tls: self.tcp.tls.clone(),
             authority: None,
-            target_addr: self.tcp.addr.into(),
         }
         .into()
     }
