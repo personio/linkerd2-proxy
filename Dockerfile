@@ -58,6 +58,8 @@ FROM $RUNTIME_IMAGE as runtime
 # CSR and key generation.
 ARG SKIP_IDENTITY_WRAPPER
 
+RUN useradd -r -u 1001 linkerd
+
 WORKDIR /linkerd
 COPY --from=build /out/linkerd2-proxy /usr/lib/linkerd/linkerd2-proxy
 ENV LINKERD2_PROXY_LOG=warn,linkerd=info
@@ -65,4 +67,5 @@ RUN if [ -n "$SKIP_IDENTITY_WRAPPER" ] ; then \
   rm -f /usr/bin/linkerd2-proxy-run && \
   ln /usr/lib/linkerd/linkerd2-proxy /usr/bin/linkerd2-proxy-run ; \
   fi
+USER linkerd
 # Inherits the ENTRYPOINT from the runtime image.
