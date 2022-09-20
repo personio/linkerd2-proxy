@@ -121,15 +121,14 @@ impl<P> svc::Param<transport::labels::Key> for Endpoint<P> {
 
 impl<P> svc::Param<metrics::OutboundEndpointLabels> for Endpoint<P> {
     fn param(&self) -> metrics::OutboundEndpointLabels {
-        let authority = self
-            .logical_addr
-            .as_ref()
-            .map(|LogicalAddr(a)| a.as_http_authority());
+
+        let dst_labels_arc = self.metadata.labels();
+        let dst_labels_for_metrics = dst_labels_arc.iter().filter(|(k, _v)| k.as_str() != "pod" && k.as_str() != "pod_template_hash");
+
         metrics::OutboundEndpointLabels {
-            authority,
-            labels: metrics::prefix_labels("dst", self.metadata.labels().iter()),
+            authority: None,
+            labels: metrics::prefix_labels("dst", dst_labels_for_metrics),
             server_id: self.tls.clone(),
-            target_addr: self.addr.into(),
         }
     }
 }

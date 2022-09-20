@@ -376,8 +376,7 @@ impl Param<metrics::EndpointLabels> for Logical {
     fn param(&self) -> metrics::EndpointLabels {
         metrics::InboundEndpointLabels {
             tls: self.tls.clone(),
-            authority: self.logical.as_ref().map(|d| d.as_http_authority()),
-            target_addr: self.addr.into(),
+            authority: None,
             policy: self.permit.labels.clone(),
         }
         .into()
