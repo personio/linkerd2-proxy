@@ -224,7 +224,6 @@ impl Param<metrics::EndpointLabels> for Permitted {
         metrics::InboundEndpointLabels {
             tls: self.http.tcp.tls.clone(),
             authority: None,
-            target_addr: self.http.tcp.addr.into(),
             policy: self.permit.labels.clone(),
         }
         .into()
