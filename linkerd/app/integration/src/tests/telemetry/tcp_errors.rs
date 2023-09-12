@@ -294,8 +294,7 @@ async fn inbound_invalid_ip() {
 
     let client = client::tcp(proxy.inbound);
     let metric = metric(&proxy)
-        .label("error", "unexpected")
-        .label("target_addr", fake_ip);
+        .label("error", "unexpected");
 
     let tcp_client = client.connect().await;
     tcp_client.write(TcpFixture::HELLO_MSG).await;
@@ -359,7 +358,6 @@ async fn inbound_direct_success() {
     let no_tls_client = client::tcp(proxy1.inbound);
 
     let metric = metrics::metric(METRIC)
-        .label("target_addr", proxy1.inbound)
         .label("error", "tls detection timeout")
         .value(1u64);
 

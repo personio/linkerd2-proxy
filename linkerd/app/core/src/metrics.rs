@@ -19,7 +19,6 @@ pub use linkerd_metrics::*;
 use linkerd_proxy_server_policy as policy;
 use std::{
     fmt::{self, Write},
-    net::SocketAddr,
     sync::Arc,
     time::Duration,
 };
@@ -66,8 +65,6 @@ pub enum EndpointLabels {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct InboundEndpointLabels {
     pub tls: tls::ConditionalServerTls,
-    pub authority: Option<http::uri::Authority>,
-    pub target_addr: SocketAddr,
     pub policy: RouteAuthzLabels,
 }
 
@@ -99,9 +96,7 @@ pub struct RouteAuthzLabels {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct OutboundEndpointLabels {
     pub server_id: tls::ConditionalClientTls,
-    pub authority: Option<http::uri::Authority>,
     pub labels: Option<String>,
-    pub target_addr: SocketAddr,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -300,17 +295,7 @@ impl FmtLabels for EndpointLabels {
 
 impl FmtLabels for InboundEndpointLabels {
     fn fmt_labels(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(a) = self.authority.as_ref() {
-            Authority(a).fmt_labels(f)?;
-            write!(f, ",")?;
-        }
-
-        (
-            (TargetAddr(self.target_addr), TlsAccept::from(&self.tls)),
-            &self.policy,
-        )
-            .fmt_labels(f)?;
-
+        ((TlsAccept::from(&self.tls)), &self.policy).fmt_labels(f)?;
         Ok(())
     }
 }
@@ -368,14 +353,8 @@ impl FmtLabels for RouteAuthzLabels {
 
 impl FmtLabels for OutboundEndpointLabels {
     fn fmt_labels(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(a) = self.authority.as_ref() {
-            Authority(a).fmt_labels(f)?;
-            write!(f, ",")?;
-        }
-
-        let ta = TargetAddr(self.target_addr);
         let tls = TlsConnect::from(&self.server_id);
-        (ta, tls).fmt_labels(f)?;
+        (tls).fmt_labels(f)?;
 
         if let Some(labels) = self.labels.as_ref() {
             write!(f, ",{}", labels)?;

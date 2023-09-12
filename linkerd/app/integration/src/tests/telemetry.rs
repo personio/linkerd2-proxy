@@ -218,7 +218,6 @@ async fn admin_request_count() {
     let metrics = fixture.metrics;
     let metric = metrics::metric("request_total")
         .label("direction", "inbound")
-        .label("target_addr", metrics.target_addr())
         .value(1usize);
 
     // We can't assert that the metric is not present, since `GET /metrics`
@@ -233,7 +232,6 @@ async fn admin_transport_metrics() {
     let metrics = fixture.metrics;
     let labels = metrics::labels()
         .label("direction", "inbound")
-        .label("target_addr", metrics.target_addr())
         .label("peer", "src");
 
     let mut open_total = labels.metric("tcp_open_total").value(1usize);

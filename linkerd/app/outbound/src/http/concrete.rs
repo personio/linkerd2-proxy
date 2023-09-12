@@ -18,7 +18,7 @@ use linkerd_app_core::{
     Error, Infallible, NameAddr,
 };
 use linkerd_proxy_client_policy::FailureAccrual;
-use std::{fmt::Debug, net::SocketAddr, sync::Arc};
+use std::{collections::BTreeMap, fmt::Debug, net::SocketAddr, sync::Arc};
 use tracing::info_span;
 
 mod metrics;
@@ -342,11 +342,19 @@ where
     T: svc::Param<Option<http::uri::Authority>>,
 {
     fn param(&self) -> OutboundEndpointLabels {
+        // self.metadata.labels() could return Err in some cases
+        // if that case the dst_labels won't carry any value
+        let mut dst_labels = match Arc::try_unwrap(self.metadata.labels()) {
+            Ok(result) => result,
+            Err(_e) => BTreeMap::new(),
+        };
+
+        dst_labels.remove("pod");
+        dst_labels.remove("pod_template_hash");
+
         OutboundEndpointLabels {
-            authority: self.parent.param(),
-            labels: prefix_labels("dst", self.metadata.labels().iter()),
+            labels: prefix_labels("dst", dst_labels.iter()),
             server_id: self.param(),
-            target_addr: self.addr.into(),
         }
     }
 }
