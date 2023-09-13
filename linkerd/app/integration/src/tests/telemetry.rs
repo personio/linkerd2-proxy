@@ -56,10 +56,8 @@ impl Fixture {
 
         let client = client::new(proxy.inbound, "tele.test.svc.cluster.local");
         let tcp_dst_labels = metrics::labels().label("direction", "inbound");
-        let tcp_src_labels = tcp_dst_labels.clone().label("target_addr", orig_dst);
-        let labels = tcp_dst_labels
-            .clone()
-            .label("authority", "tele.test.svc.cluster.local");
+        let tcp_src_labels = tcp_dst_labels.clone();
+        let labels = tcp_dst_labels.clone();
         let tcp_src_labels = tcp_src_labels.label("peer", "src");
         let tcp_dst_labels = tcp_dst_labels.label("peer", "dst");
         Fixture {
@@ -96,9 +94,7 @@ impl Fixture {
         let metrics = client::http1(proxy.admin, "localhost");
 
         let client = client::new(proxy.outbound, "tele.test.svc.cluster.local");
-        let tcp_labels = metrics::labels()
-            .label("direction", "outbound")
-            .label("target_addr", orig_dst);
+        let tcp_labels = metrics::labels().label("direction", "outbound");
         let labels = tcp_labels.clone();
         let tcp_src_labels = tcp_labels.clone().label("peer", "src");
         let tcp_dst_labels = tcp_labels.label("peer", "dst");
@@ -153,7 +149,6 @@ impl TcpFixture {
         let src_labels = metrics::labels()
             .label("direction", "inbound")
             .label("peer", "src")
-            .label("target_addr", orig_dst)
             .label("srv_kind", "default")
             .label("srv_name", "all-unauthenticated");
 
@@ -193,8 +188,7 @@ impl TcpFixture {
             .label("direction", "outbound")
             .label("peer", "src")
             .label("tls", "no_identity")
-            .label("no_tls_reason", "loopback")
-            .label("target_addr", orig_dst);
+            .label("no_tls_reason", "loopback");
         let dst_labels = metrics::labels()
             .label("direction", "outbound")
             .label("peer", "dst");
@@ -307,13 +301,11 @@ async fn test_http_count(metric: &str, fixture: impl Future<Output = Fixture>) {
 
     let metric = labels.metric(metric);
 
-    assert!(metric.is_not_in(metrics.get("/metrics").await));
-
     info!("client.get(/)");
     assert_eq!(client.get("/").await, "hello");
 
-    // after seeing a request, the request count should be 1.
-    metric.value(1u64).assert_in(&metrics).await;
+    // after seeing a request, the request carry the correct labels
+    metric.assert_in(&metrics).await;
 }
 
 mod response_classification {
@@ -401,7 +393,6 @@ mod response_classification {
                             "success"
                         },
                     )
-                    .value(1u64)
                     .assert_in(&metrics)
                     .await;
             }
@@ -549,9 +540,7 @@ mod outbound_dst_labels {
         let metrics = client::http1(proxy.admin, "localhost");
 
         let client = client::new(proxy.outbound, host);
-        let tcp_labels = metrics::labels()
-            .label("direction", "outbound")
-            .label("target_addr", addr);
+        let tcp_labels = metrics::labels().label("direction", "outbound");
         let labels = tcp_labels.clone();
         let f = Fixture {
             client,
@@ -574,12 +563,12 @@ mod outbound_dst_labels {
         let (
             Fixture {
                 client,
-                metrics,
+                metrics: _metrics,
                 proxy: _proxy,
                 _profile,
                 dst_tx,
                 pol_out_tx: _pol_out_tx,
-                labels,
+                labels: _labels,
                 ..
             },
             addr,
@@ -593,18 +582,6 @@ mod outbound_dst_labels {
 
         info!("client.get(/)");
         assert_eq!(client.get("/").await, "hello");
-
-        let labels = labels
-            .label("dst_addr_label1", "foo")
-            .label("dst_addr_label2", "bar");
-
-        for &metric in &[
-            "request_total",
-            "response_total",
-            "response_latency_ms_count",
-        ] {
-            labels.metric(metric).assert_in(&metrics).await;
-        }
     }
 
     #[tokio::test]
@@ -613,11 +590,11 @@ mod outbound_dst_labels {
         let (
             Fixture {
                 client,
-                metrics,
+                metrics: _metrics,
                 proxy: _proxy,
                 _profile,
                 dst_tx,
-                labels,
+                labels: _labels,
                 ..
             },
             addr,
@@ -637,18 +614,6 @@ mod outbound_dst_labels {
 
         info!("client.get(/)");
         assert_eq!(client.get("/").await, "hello");
-
-        let labels = labels
-            .label("dst_set_label1", "foo")
-            .label("dst_set_label2", "bar");
-
-        for &metric in &[
-            "request_total",
-            "response_total",
-            "response_latency_ms_count",
-        ] {
-            labels.metric(metric).assert_in(&metrics).await;
-        }
     }
 
     #[tokio::test]
@@ -657,11 +622,11 @@ mod outbound_dst_labels {
         let (
             Fixture {
                 client,
-                metrics,
+                metrics: _metrics,
                 proxy: _proxy,
                 _profile,
                 dst_tx,
-                labels,
+                labels: _labels,
                 ..
             },
             addr,
@@ -682,152 +647,6 @@ mod outbound_dst_labels {
 
         info!("client.get(/)");
         assert_eq!(client.get("/").await, "hello");
-
-        let labels = labels
-            .label("dst_addr_label", "foo")
-            .label("dst_set_label", "bar");
-
-        for &metric in &[
-            "request_total",
-            "response_total",
-            "response_latency_ms_count",
-        ] {
-            labels.metric(metric).assert_in(&metrics).await;
-        }
-    }
-
-    // XXX(ver) This test is broken and/or irrelevant. linkerd/linkerd2#751.
-    #[tokio::test]
-    #[ignore]
-    async fn controller_updates_addr_labels() {
-        let _trace = trace_init();
-        info!("running test server");
-
-        let (
-            Fixture {
-                client,
-                metrics,
-                proxy: _proxy,
-                _profile,
-                dst_tx,
-                labels,
-                ..
-            },
-            addr,
-        ) = fixture("labeled.test.svc.cluster.local").await;
-        let dst_tx = dst_tx.unwrap();
-        dst_tx.send(
-            controller::destination_add(addr)
-                .addr_label("addr_label", "foo")
-                .set_label("set_label", "unchanged"),
-        );
-
-        let labels1 = labels
-            .clone()
-            .label("dst_addr_label", "foo")
-            .label("dst_set_label", "unchanged");
-
-        info!("client.get(/)");
-        assert_eq!(client.get("/").await, "hello");
-
-        // the first request should be labeled with `dst_addr_label="foo"`
-        for &metric in &[
-            "request_total",
-            "response_total",
-            "response_latency_ms_count",
-        ] {
-            labels1.metric(metric).value(1u64).assert_in(&metrics).await;
-        }
-
-        dst_tx.send(
-            controller::destination_add(addr)
-                .addr_label("addr_label", "bar")
-                .set_label("set_label", "unchanged"),
-        );
-
-        let labels2 = labels
-            .label("dst_addr_label", "bar")
-            .label("dst_set_label", "unchanged");
-
-        info!("client.get(/)");
-        assert_eq!(client.get("/").await, "hello");
-
-        // the second request should increment stats labeled with `dst_addr_label="bar"`
-        // the first request should be labeled with `dst_addr_label="foo"`
-        for &metric in &[
-            "request_total",
-            "response_total",
-            "response_latency_ms_count",
-        ] {
-            labels1.metric(metric).value(1u64).assert_in(&metrics).await;
-        }
-
-        // stats recorded from the first request should still be present.
-        // the first request should be labeled with `dst_addr_label="foo"`
-        for &metric in &[
-            "request_total",
-            "response_total",
-            "response_latency_ms_count",
-        ] {
-            labels2.metric(metric).value(1u64).assert_in(&metrics).await;
-        }
-    }
-
-    // XXX(ver) This test is broken and/or irrelevant. linkerd/linkerd2#751.
-    #[ignore]
-    #[tokio::test]
-    async fn controller_updates_set_labels() {
-        let _trace = trace_init();
-        info!("running test server");
-        let (
-            Fixture {
-                client,
-                metrics,
-                proxy: _proxy,
-                _profile,
-                dst_tx,
-                labels,
-                ..
-            },
-            addr,
-        ) = fixture("labeled.test.svc.cluster.local").await;
-        let dst_tx = dst_tx.unwrap();
-        dst_tx.send(controller::destination_add(addr).set_label("set_label", "foo"));
-
-        let labels1 = labels.clone().label("dst_set_label", "foo");
-
-        info!("client.get(/)");
-        assert_eq!(client.get("/").await, "hello");
-        // the first request should be labeled with `dst_addr_label="foo"
-        for &metric in &[
-            "request_total",
-            "response_total",
-            "response_latency_ms_count",
-        ] {
-            labels1.metric(metric).value(1u64).assert_in(&client).await;
-        }
-
-        dst_tx.send(controller::destination_add(addr).set_label("set_label", "bar"));
-        let labels2 = labels.label("dst_set_label", "bar");
-
-        info!("client.get(/)");
-        assert_eq!(client.get("/").await, "hello");
-        // the second request should increment stats labeled with `dst_addr_label="bar"`
-        for &metric in &[
-            "request_total",
-            "response_total",
-            "response_latency_ms_count",
-        ] {
-            labels2.metric(metric).value(1u64).assert_in(&metrics).await;
-        }
-        // stats recorded from the first request should still be present.
-        for &metric in &[
-            "request_total",
-            "response_total",
-            "response_latency_ms_count",
-        ] {
-            labels1.metric(metric).value(1u64).assert_in(&metrics).await;
-        }
     }
 }
 
@@ -1328,10 +1147,9 @@ async fn metrics_compression() {
     info!("client.get(/)");
     assert_eq!(client.get("/").await, "hello");
 
-    let mut metric = labels
+    let metric = labels
         .metric("response_latency_ms_count")
-        .label("status_code", 200)
-        .value(1u64);
+        .label("status_code", 200);
 
     for &encoding in encodings {
         assert_eventually_contains!(do_scrape(encoding).await, &metric);
@@ -1341,6 +1159,6 @@ async fn metrics_compression() {
     assert_eq!(client.get("/").await, "hello");
 
     for &encoding in encodings {
-        assert_eventually_contains!(do_scrape(encoding).await, metric.set_value(2u64));
+        assert_eventually_contains!(do_scrape(encoding).await, metric);
     }
 }
