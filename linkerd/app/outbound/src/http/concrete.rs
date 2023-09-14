@@ -5,7 +5,7 @@ use super::{balance, breaker, client, handle_proxy_error_headers};
 use crate::{http, stack_labels, BackendRef, Outbound, ParentRef};
 use linkerd_app_core::{
     classify,
-    metrics::{prefix_labels, EndpointLabels, OutboundEndpointLabels},
+    metrics::{prefix_outbound_endpoint_labels, EndpointLabels, OutboundEndpointLabels},
     profiles,
     proxy::{
         api_resolve::{ConcreteAddr, Metadata, ProtocolHint},
@@ -18,7 +18,7 @@ use linkerd_app_core::{
     Error, Infallible, NameAddr,
 };
 use linkerd_proxy_client_policy::FailureAccrual;
-use std::{collections::BTreeMap, fmt::Debug, net::SocketAddr, sync::Arc};
+use std::{fmt::Debug, net::SocketAddr, sync::Arc};
 use tracing::info_span;
 
 mod metrics;
@@ -342,24 +342,8 @@ where
     T: svc::Param<Option<http::uri::Authority>>,
 {
     fn param(&self) -> OutboundEndpointLabels {
-        let original_labels = self.metadata.labels().clone();
-        // self.metadata.labels() could return Err in some cases
-        // if that case the dst_labels won't carry any value
-        let dst_labels = match Arc::try_unwrap(self.metadata.labels()) {
-            Ok(result) => result,
-            Err(_e) => BTreeMap::new(),
-        };
-
-        // dst_labels.remove("pod");
-        // dst_labels.remove("pod_template_hash");
-
-        let label_iterator = match dst_labels.is_empty() {
-            true => dst_labels.iter(),
-            false => original_labels.iter()
-        };
-
         OutboundEndpointLabels {
-            labels: prefix_labels("dst", label_iterator),
+            labels: prefix_outbound_endpoint_labels("dst", self.metadata.labels().iter()),
             server_id: self.param(),
         }
     }

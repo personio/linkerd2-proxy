@@ -563,12 +563,12 @@ mod outbound_dst_labels {
         let (
             Fixture {
                 client,
-                metrics: _metrics,
+                metrics,
                 proxy: _proxy,
                 _profile,
                 dst_tx,
                 pol_out_tx: _pol_out_tx,
-                labels: _labels,
+                labels,
                 ..
             },
             addr,
@@ -582,6 +582,18 @@ mod outbound_dst_labels {
 
         info!("client.get(/)");
         assert_eq!(client.get("/").await, "hello");
+
+        let labels = labels
+            .label("dst_addr_label1", "foo")
+            .label("dst_addr_label2", "bar");
+
+        for &metric in &[
+            "request_total",
+            "response_total",
+            "response_latency_ms_count",
+        ] {
+            labels.metric(metric).assert_in(&metrics).await;
+        }
     }
 
     #[tokio::test]
@@ -590,11 +602,11 @@ mod outbound_dst_labels {
         let (
             Fixture {
                 client,
-                metrics: _metrics,
+                metrics,
                 proxy: _proxy,
                 _profile,
                 dst_tx,
-                labels: _labels,
+                labels,
                 ..
             },
             addr,
@@ -614,6 +626,18 @@ mod outbound_dst_labels {
 
         info!("client.get(/)");
         assert_eq!(client.get("/").await, "hello");
+
+        let labels = labels
+            .label("dst_set_label1", "foo")
+            .label("dst_set_label2", "bar");
+
+        for &metric in &[
+            "request_total",
+            "response_total",
+            "response_latency_ms_count",
+        ] {
+            labels.metric(metric).assert_in(&metrics).await;
+        }
     }
 
     #[tokio::test]

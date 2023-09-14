@@ -135,6 +135,23 @@ where
     Some(out)
 }
 
+pub fn prefix_outbound_endpoint_labels<'i, I>(prefix: &str, mut labels_iter: I) -> Option<String>
+where
+    I: Iterator<Item = (&'i String, &'i String)>,
+{
+    let (k0, v0) = labels_iter.next()?;
+    let mut out = format!("{}_{}=\"{}\"", prefix, k0, v0);
+
+    for (k, v) in labels_iter {
+        if k == "pod" || k == "pod_template_hash" {
+            continue;
+        }
+
+        write!(out, ",{}_{}=\"{}\"", prefix, k, v).expect("label concat must succeed");
+    }
+    Some(out)
+}
+
 // === impl Metrics ===
 
 impl Metrics {
