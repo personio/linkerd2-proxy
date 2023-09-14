@@ -342,18 +342,24 @@ where
     T: svc::Param<Option<http::uri::Authority>>,
 {
     fn param(&self) -> OutboundEndpointLabels {
+        let original_labels = self.metadata.labels().clone();
         // self.metadata.labels() could return Err in some cases
         // if that case the dst_labels won't carry any value
-        let mut dst_labels = match Arc::try_unwrap(self.metadata.labels()) {
+        let dst_labels = match Arc::try_unwrap(self.metadata.labels()) {
             Ok(result) => result,
             Err(_e) => BTreeMap::new(),
         };
 
-        dst_labels.remove("pod");
-        dst_labels.remove("pod_template_hash");
+        // dst_labels.remove("pod");
+        // dst_labels.remove("pod_template_hash");
+
+        let label_iterator = match dst_labels.is_empty() {
+            true => dst_labels.iter(),
+            false => original_labels.iter()
+        };
 
         OutboundEndpointLabels {
-            labels: prefix_labels("dst", dst_labels.iter()),
+            labels: prefix_labels("dst", label_iterator),
             server_id: self.param(),
         }
     }
