@@ -301,7 +301,6 @@ async fn test_http_count(metric: &str, fixture: impl Future<Output = Fixture>) {
 
     let metric = labels.metric(metric);
 
-
     info!("client.get(/)");
     assert_eq!(client.get("/").await, "hello");
 
