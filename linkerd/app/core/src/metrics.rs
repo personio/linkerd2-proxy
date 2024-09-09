@@ -135,7 +135,7 @@ where
     let mut out = format!("{}_{}=\"{}\"", prefix, k0, v0);
 
     for (k, v) in labels_iter {
-        write!(out, ",{}_{}=\"{}\"", prefix, k, v).expect("label concat must succeed");
+        write!(out, ",{}_{}=\"{}\"", prefix, k, v).expect("label concat must succeed to proceed");
     }
     Some(out)
 }
