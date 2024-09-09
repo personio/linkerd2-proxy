@@ -142,7 +142,7 @@ where
     let mut out = format!("{}_{}=\"{}\"", prefix, k0, v0);
 
     for (k, v) in labels_iter {
-        if k == "pod" || k == "pod_template_hash" {
+        if k == "pod" || k == "pod_template_hash" || k == "zone" {
             continue;
         }
 
