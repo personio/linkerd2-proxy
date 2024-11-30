@@ -13,7 +13,7 @@ http-body = "0.4"
 http = "0.2"
 parking_lot = "0.12"
 tracing = "0.1"
-thiserror = "1"
+thiserror = "2"
 
 linkerd-error = { path = "../../error" }
 linkerd-stack = { path = "../../stack" }
