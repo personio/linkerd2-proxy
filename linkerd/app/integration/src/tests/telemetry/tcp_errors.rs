@@ -292,8 +292,7 @@ async fn inbound_invalid_ip() {
         .await;
 
     let client = crate::tcp::client(proxy.inbound);
-    let metric = metric(&proxy)
-        .label("error", "unexpected");
+    let metric = metric(&proxy).label("error", "unexpected");
 
     let tcp_client = client.connect().await;
     tcp_client.write(TcpFixture::HELLO_MSG).await;

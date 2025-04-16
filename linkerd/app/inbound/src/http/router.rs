@@ -391,7 +391,7 @@ impl Param<transport::labels::Key> for Logical {
 }
 
 fn endpoint_labels(
-    unsafe_authority_labels: bool,
+    _unsafe_authority_labels: bool,
 ) -> impl svc::ExtractParam<metrics::EndpointLabels, Logical> + Clone {
     move |t: &Logical| -> metrics::EndpointLabels {
         metrics::InboundEndpointLabels {

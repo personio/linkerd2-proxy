@@ -94,7 +94,7 @@ impl Fixture {
         let metrics = client::http1(proxy.admin, "localhost");
 
         let client = client::new(proxy.outbound, "tele.test.svc.cluster.local");
-        let tcp_labels = metrics::labels().label("direction", "outbound")
+        let tcp_labels = metrics::labels().label("direction", "outbound");
         let labels = tcp_labels.clone();
         let tcp_src_labels = tcp_labels.clone().label("peer", "src");
         let tcp_dst_labels = tcp_labels.label("peer", "dst");
@@ -299,14 +299,24 @@ async fn test_http_count(metric_name: &str, fixture: impl Future<Output = Fixtur
         ..
     } = fixture.await;
 
-    let metric = labels.metric(metric_name);
+    // Instead of checking that the metric doesn't exist at all, check that the
+    // specific metric with service name matching the test doesn't exist.
+    // This avoids the issue with the admin metrics endpoint counting its own calls.
+    let test_specific_metric = labels
+        .metric(metric_name)
+        .label("srv_name", "tele.test.svc.cluster.local");
+
     let scrape = metrics.get("/metrics").await;
+    assert!(
+        test_specific_metric.is_not_in(scrape),
+        "{test_specific_metric:?} should not be in /metrics"
+    );
 
     info!("client.get(/)");
     assert_eq!(client.get("/").await, "hello");
 
     // after seeing a request, the request carry the correct labels
-    metric.assert_in(&metrics).await;
+    test_specific_metric.assert_in(&metrics).await;
 }
 
 mod response_classification {
@@ -1187,7 +1197,7 @@ async fn metrics_compression() {
     info!("client.get(/)");
     assert_eq!(client.get("/").await, "hello");
 
-    let mut metric = labels
+    let metric = labels
         .metric("response_latency_ms_count")
         .label("status_code", 200);
 

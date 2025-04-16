@@ -665,8 +665,6 @@ async fn grpc_response_class() {
         .get_response_total(
             &metrics::EndpointLabels::Inbound(metrics::InboundEndpointLabels {
                 tls: Target::meshed_h2().1,
-                authority: None,
-                target_addr: "127.0.0.1:80".parse().unwrap(),
                 policy: metrics::RouteAuthzLabels {
                     route: metrics::RouteLabels {
                         server: metrics::ServerLabel(
@@ -714,7 +712,7 @@ async fn unsafe_authority_labels_false() {
 
 async fn test_unsafe_authority_labels(
     cfg: Config,
-    expected_authority: Option<http::uri::Authority>,
+    _expected_authority: Option<http::uri::Authority>,
 ) {
     let connect = {
         let mut server = hyper::server::conn::http1::Builder::new();
@@ -763,8 +761,6 @@ async fn test_unsafe_authority_labels(
         .get_response_total(
             &metrics::EndpointLabels::Inbound(metrics::InboundEndpointLabels {
                 tls: Target::meshed_http1().1,
-                authority: expected_authority,
-                target_addr: "127.0.0.1:80".parse().unwrap(),
                 policy: metrics::RouteAuthzLabels {
                     route: metrics::RouteLabels {
                         server: metrics::ServerLabel(
