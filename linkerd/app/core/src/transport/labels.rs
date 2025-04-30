@@ -168,11 +168,10 @@ impl FmtLabels for TlsConnect<'_> {
 
 impl FmtLabels for TargetAddr {
     fn fmt_labels(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Due to high cardinality of the target addresses and ips, we will only keep the port.
         write!(
             f,
-            "target_addr=\"{}\",target_ip=\"{}\",target_port=\"{}\"",
-            self.0,
-            self.0.ip(),
+            "target_addr=\"na\",target_ip=\"na\",target_port=\"{}\"",
             self.0.port()
         )
     }
@@ -211,7 +210,7 @@ mod tests {
         assert_eq!(
             labels.to_string(),
             "direction=\"inbound\",peer=\"src\",\
-            target_addr=\"192.0.2.4:40000\",target_ip=\"192.0.2.4\",target_port=\"40000\",\
+            target_addr=\"na\",target_ip=\"na\",target_port=\"40000\",\
             tls=\"true\",client_id=\"foo.id.example.com\",\
             srv_group=\"policy.linkerd.io\",srv_kind=\"server\",srv_name=\"testserver\",srv_port=\"40000\""
         );
