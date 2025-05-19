@@ -210,10 +210,8 @@ where
 {
     fn param(&self) -> OutboundEndpointLabels {
         OutboundEndpointLabels {
-            authority: self.parent.param(),
             labels: prefix_outbound_endpoint_labels("dst", self.metadata.labels().iter()),
             server_id: self.param(),
-            target_addr: self.addr.into(),
         }
     }
 }

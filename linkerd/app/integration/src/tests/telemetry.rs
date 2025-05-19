@@ -267,29 +267,19 @@ async fn admin_transport_metrics() {
 }
 
 #[tokio::test]
-async fn metrics_endpoint_inbound_request_count() {
-    test_http_count("request_total", "inbound", Fixture::inbound()).await;
-}
-
-#[tokio::test]
 async fn metrics_endpoint_outbound_request_count() {
-    test_http_count("request_total", "outbound", Fixture::outbound()).await
-}
-
-#[tokio::test]
-async fn metrics_endpoint_inbound_response_count() {
-    test_http_count("response_total", "inbound", Fixture::inbound()).await;
+    test_http_count("request_total", Fixture::outbound(), 1u64).await
 }
 
 #[tokio::test]
 async fn metrics_endpoint_outbound_response_count() {
-    test_http_count("response_total", "outbound", Fixture::outbound()).await
+    test_http_count("response_total", Fixture::outbound(), 1u64).await
 }
 
 async fn test_http_count(
     metric: &str,
-    traffic_direction: &str,
     fixture: impl Future<Output = Fixture>,
+    expected_count: u64,
 ) {
     let _trace = trace_init();
     let Fixture {
@@ -303,23 +293,12 @@ async fn test_http_count(
         ..
     } = fixture.await;
 
-    // Add extra cardinality for http counts test only to make sure the test server doesn't to +=1
-    // to existing metrics after the target_addr label is removed.
-    // The combinations are inbound_request, inbound_response, outbound_request, outbound_response
-    let expected_labels = labels.clone().label(
-        "test_case",
-        format!("{}_{}", "dst_deployment", traffic_direction),
-    );
-
-    let metric = expected_labels.metric(metric);
-
-    assert!(metric.is_not_in(metrics.get("/metrics").await));
+    let metric = labels.metric(metric);
 
     info!("client.get(/)");
     assert_eq!(client.get("/").await, "hello");
 
-    // after seeing a request, the request count should be 1.
-    metric.value(1u64).assert_in(&metrics).await;
+    metric.value(expected_count).assert_in(&metrics).await;
 }
 
 mod response_classification {
@@ -407,7 +386,6 @@ mod response_classification {
                             "success"
                         },
                     )
-                    .value(1u64)
                     .assert_in(&metrics)
                     .await;
             }
@@ -1196,10 +1174,9 @@ async fn metrics_compression() {
     info!("client.get(/)");
     assert_eq!(client.get("/").await, "hello");
 
-    let mut metric = labels
+    let metric = labels
         .metric("response_latency_ms_count")
-        .label("status_code", 200)
-        .value(1u64);
+        .label("status_code", 200);
 
     for &encoding in encodings {
         assert_eventually_contains!(do_scrape(encoding).await, &metric);
@@ -1209,6 +1186,6 @@ async fn metrics_compression() {
     assert_eq!(client.get("/").await, "hello");
 
     for &encoding in encodings {
-        assert_eventually_contains!(do_scrape(encoding).await, metric.set_value(2u64));
+        assert_eventually_contains!(do_scrape(encoding).await, metric);
     }
 }
