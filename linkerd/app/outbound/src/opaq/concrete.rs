@@ -322,7 +322,7 @@ where
             .map(|profiles::LogicalAddr(a)| a.as_http_authority());
         metrics::OutboundEndpointLabels {
             authority,
-            labels: metrics::prefix_labels("dst", self.metadata.labels().iter()),
+            labels: metrics::prefix_outbound_endpoint_labels("dst", self.metadata.labels().iter()),
             server_id: self.param(),
             target_addr: self.addr.into(),
         }

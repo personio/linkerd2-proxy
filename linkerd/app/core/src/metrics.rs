@@ -140,6 +140,23 @@ where
     Some(out)
 }
 
+pub fn prefix_outbound_endpoint_labels<'i, I>(prefix: &str, mut labels_iter: I) -> Option<String>
+where
+    I: Iterator<Item = (&'i String, &'i String)>,
+{
+    let (k0, v0) = labels_iter.next()?;
+    let mut out = format!("{}_{}=\"{}\"", prefix, k0, v0);
+
+    for (k, v) in labels_iter {
+        if k == "pod" || k == "pod_template_hash" || k == "zone" {
+            continue;
+        }
+
+        write!(out, ",{}_{}=\"{}\"", prefix, k, v).expect("label concat must succeed");
+    }
+    Some(out)
+}
+
 // === impl Metrics ===
 
 impl Metrics {
@@ -291,13 +308,8 @@ impl FmtLabels for EndpointLabels {
 
 impl FmtLabels for InboundEndpointLabels {
     fn fmt_labels(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(a) = self.authority.as_ref() {
-            Authority(a).fmt_labels(f)?;
-            write!(f, ",")?;
-        }
-
         (
-            (TargetAddr(self.target_addr), TlsAccept::from(&self.tls)),
+            (TlsAccept::from(&self.tls)),
             &self.policy,
         )
             .fmt_labels(f)?;
@@ -359,14 +371,8 @@ impl FmtLabels for RouteAuthzLabels {
 
 impl FmtLabels for OutboundEndpointLabels {
     fn fmt_labels(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(a) = self.authority.as_ref() {
-            Authority(a).fmt_labels(f)?;
-            write!(f, ",")?;
-        }
-
-        let ta = TargetAddr(self.target_addr);
         let tls = TlsConnect::from(&self.server_id);
-        (ta, tls).fmt_labels(f)?;
+        (tls).fmt_labels(f)?;
 
         if let Some(labels) = self.labels.as_ref() {
             write!(f, ",{}", labels)?;
