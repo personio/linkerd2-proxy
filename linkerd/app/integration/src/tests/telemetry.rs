@@ -56,10 +56,8 @@ impl Fixture {
 
         let client = client::new(proxy.inbound, "tele.test.svc.cluster.local");
         let tcp_dst_labels = metrics::labels().label("direction", "inbound");
-        let tcp_src_labels = tcp_dst_labels.clone().label("target_addr", orig_dst);
-        let labels = tcp_dst_labels
-            .clone()
-            .label("authority", "tele.test.svc.cluster.local");
+        let tcp_src_labels = tcp_dst_labels.clone();
+        let labels = tcp_dst_labels.clone();
         let tcp_src_labels = tcp_src_labels.label("peer", "src");
         let tcp_dst_labels = tcp_dst_labels.label("peer", "dst");
         Fixture {
@@ -96,9 +94,7 @@ impl Fixture {
         let metrics = client::http1(proxy.admin, "localhost");
 
         let client = client::new(proxy.outbound, "tele.test.svc.cluster.local");
-        let tcp_labels = metrics::labels()
-            .label("direction", "outbound")
-            .label("target_addr", orig_dst);
+        let tcp_labels = metrics::labels().label("direction", "outbound");
         let labels = tcp_labels.clone();
         let tcp_src_labels = tcp_labels.clone().label("peer", "src");
         let tcp_dst_labels = tcp_labels.label("peer", "dst");
@@ -153,7 +149,6 @@ impl TcpFixture {
         let src_labels = metrics::labels()
             .label("direction", "inbound")
             .label("peer", "src")
-            .label("target_addr", orig_dst)
             .label("srv_kind", "default")
             .label("srv_name", "all-unauthenticated");
 
@@ -193,8 +188,7 @@ impl TcpFixture {
             .label("direction", "outbound")
             .label("peer", "src")
             .label("tls", "no_identity")
-            .label("no_tls_reason", "loopback")
-            .label("target_addr", orig_dst);
+            .label("no_tls_reason", "loopback");
         let dst_labels = metrics::labels()
             .label("direction", "outbound")
             .label("peer", "dst");
@@ -218,7 +212,6 @@ async fn admin_request_count() {
     let metrics = fixture.metrics;
     let metric = metrics::metric("request_total")
         .label("direction", "inbound")
-        .label("target_addr", metrics.target_addr())
         .value(1usize);
 
     // We can't assert that the metric is not present, since `GET /metrics`
@@ -233,7 +226,6 @@ async fn admin_transport_metrics() {
     let metrics = fixture.metrics;
     let labels = metrics::labels()
         .label("direction", "inbound")
-        .label("target_addr", metrics.target_addr())
         .label("peer", "src");
 
     let mut open_total = labels.metric("tcp_open_total").value(1usize);
@@ -276,25 +268,29 @@ async fn admin_transport_metrics() {
 
 #[tokio::test]
 async fn metrics_endpoint_inbound_request_count() {
-    test_http_count("request_total", Fixture::inbound()).await;
+    test_http_count("request_total", "inbound", Fixture::inbound()).await;
 }
 
 #[tokio::test]
 async fn metrics_endpoint_outbound_request_count() {
-    test_http_count("request_total", Fixture::outbound()).await
+    test_http_count("request_total", "outbound", Fixture::outbound()).await
 }
 
 #[tokio::test]
 async fn metrics_endpoint_inbound_response_count() {
-    test_http_count("response_total", Fixture::inbound()).await;
+    test_http_count("response_total", "inbound", Fixture::inbound()).await;
 }
 
 #[tokio::test]
 async fn metrics_endpoint_outbound_response_count() {
-    test_http_count("response_total", Fixture::outbound()).await
+    test_http_count("response_total", "outbound", Fixture::outbound()).await
 }
 
-async fn test_http_count(metric: &str, fixture: impl Future<Output = Fixture>) {
+async fn test_http_count(
+    metric: &str,
+    traffic_direction: &str,
+    fixture: impl Future<Output = Fixture>,
+) {
     let _trace = trace_init();
     let Fixture {
         client,
@@ -307,7 +303,15 @@ async fn test_http_count(metric: &str, fixture: impl Future<Output = Fixture>) {
         ..
     } = fixture.await;
 
-    let metric = labels.metric(metric);
+    // Add extra cardinality for http counts test only to make sure the test server doesn't to +=1
+    // to existing metrics after the target_addr label is removed.
+    // The combinations are inbound_request, inbound_response, outbound_request, outbound_response
+    let expected_labels = labels.clone().label(
+        "test_case",
+        format!("{}_{}", "dst_deployment", traffic_direction),
+    );
+
+    let metric = expected_labels.metric(metric);
 
     assert!(metric.is_not_in(metrics.get("/metrics").await));
 
@@ -551,9 +555,7 @@ mod outbound_dst_labels {
         let metrics = client::http1(proxy.admin, "localhost");
 
         let client = client::new(proxy.outbound, host);
-        let tcp_labels = metrics::labels()
-            .label("direction", "outbound")
-            .label("target_addr", addr);
+        let tcp_labels = metrics::labels().label("direction", "outbound");
         let labels = tcp_labels.clone();
         let f = Fixture {
             client,
@@ -695,140 +697,6 @@ mod outbound_dst_labels {
             "response_latency_ms_count",
         ] {
             labels.metric(metric).assert_in(&metrics).await;
-        }
-    }
-
-    // XXX(ver) This test is broken and/or irrelevant. linkerd/linkerd2#751.
-    #[tokio::test]
-    #[ignore]
-    async fn controller_updates_addr_labels() {
-        let _trace = trace_init();
-        info!("running test server");
-
-        let (
-            Fixture {
-                client,
-                metrics,
-                proxy: _proxy,
-                _profile,
-                dst_tx,
-                labels,
-                ..
-            },
-            addr,
-        ) = fixture("labeled.test.svc.cluster.local").await;
-        let dst_tx = dst_tx.unwrap();
-        dst_tx.send(
-            controller::destination_add(addr)
-                .addr_label("addr_label", "foo")
-                .set_label("set_label", "unchanged"),
-        );
-
-        let labels1 = labels
-            .clone()
-            .label("dst_addr_label", "foo")
-            .label("dst_set_label", "unchanged");
-
-        info!("client.get(/)");
-        assert_eq!(client.get("/").await, "hello");
-
-        // the first request should be labeled with `dst_addr_label="foo"`
-        for &metric in &[
-            "request_total",
-            "response_total",
-            "response_latency_ms_count",
-        ] {
-            labels1.metric(metric).value(1u64).assert_in(&metrics).await;
-        }
-
-        dst_tx.send(
-            controller::destination_add(addr)
-                .addr_label("addr_label", "bar")
-                .set_label("set_label", "unchanged"),
-        );
-
-        let labels2 = labels
-            .label("dst_addr_label", "bar")
-            .label("dst_set_label", "unchanged");
-
-        info!("client.get(/)");
-        assert_eq!(client.get("/").await, "hello");
-
-        // the second request should increment stats labeled with `dst_addr_label="bar"`
-        // the first request should be labeled with `dst_addr_label="foo"`
-        for &metric in &[
-            "request_total",
-            "response_total",
-            "response_latency_ms_count",
-        ] {
-            labels1.metric(metric).value(1u64).assert_in(&metrics).await;
-        }
-
-        // stats recorded from the first request should still be present.
-        // the first request should be labeled with `dst_addr_label="foo"`
-        for &metric in &[
-            "request_total",
-            "response_total",
-            "response_latency_ms_count",
-        ] {
-            labels2.metric(metric).value(1u64).assert_in(&metrics).await;
-        }
-    }
-
-    // XXX(ver) This test is broken and/or irrelevant. linkerd/linkerd2#751.
-    #[ignore]
-    #[tokio::test]
-    async fn controller_updates_set_labels() {
-        let _trace = trace_init();
-        info!("running test server");
-        let (
-            Fixture {
-                client,
-                metrics,
-                proxy: _proxy,
-                _profile,
-                dst_tx,
-                labels,
-                ..
-            },
-            addr,
-        ) = fixture("labeled.test.svc.cluster.local").await;
-        let dst_tx = dst_tx.unwrap();
-        dst_tx.send(controller::destination_add(addr).set_label("set_label", "foo"));
-
-        let labels1 = labels.clone().label("dst_set_label", "foo");
-
-        info!("client.get(/)");
-        assert_eq!(client.get("/").await, "hello");
-        // the first request should be labeled with `dst_addr_label="foo"
-        for &metric in &[
-            "request_total",
-            "response_total",
-            "response_latency_ms_count",
-        ] {
-            labels1.metric(metric).value(1u64).assert_in(&client).await;
-        }
-
-        dst_tx.send(controller::destination_add(addr).set_label("set_label", "bar"));
-        let labels2 = labels.label("dst_set_label", "bar");
-
-        info!("client.get(/)");
-        assert_eq!(client.get("/").await, "hello");
-        // the second request should increment stats labeled with `dst_addr_label="bar"`
-        for &metric in &[
-            "request_total",
-            "response_total",
-            "response_latency_ms_count",
-        ] {
-            labels2.metric(metric).value(1u64).assert_in(&metrics).await;
-        }
-        // stats recorded from the first request should still be present.
-        for &metric in &[
-            "request_total",
-            "response_total",
-            "response_latency_ms_count",
-        ] {
-            labels1.metric(metric).value(1u64).assert_in(&metrics).await;
         }
     }
 }
