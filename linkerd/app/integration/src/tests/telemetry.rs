@@ -59,7 +59,8 @@ impl Fixture {
         let tcp_src_labels = tcp_dst_labels.clone().label("target_addr", orig_dst);
         let labels = tcp_dst_labels
             .clone()
-            .label("authority", "tele.test.svc.cluster.local");
+            .label("authority", "tele.test.svc.cluster.local")
+            .label("ping", "pong");
         let tcp_src_labels = tcp_src_labels.label("peer", "src");
         let tcp_dst_labels = tcp_dst_labels.label("peer", "dst");
         Fixture {
