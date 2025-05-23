@@ -326,11 +326,9 @@ where
 {
     fn param(&self) -> metrics::OutboundEndpointLabels {
         metrics::OutboundEndpointLabels {
-            authority: None,
             labels: metrics::prefix_labels("dst", self.metadata.labels().iter()),
             zone_locality: self.param(),
             server_id: self.param(),
-            target_addr: self.addr.into(),
         }
     }
 }
