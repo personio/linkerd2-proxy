@@ -666,7 +666,6 @@ async fn grpc_response_class() {
             &metrics::EndpointLabels::Inbound(metrics::InboundEndpointLabels {
                 tls: Target::meshed_h2().1,
                 authority: None,
-                target_addr: "127.0.0.1:80".parse().unwrap(),
                 policy: metrics::RouteAuthzLabels {
                     route: metrics::RouteLabels {
                         server: metrics::ServerLabel(
@@ -764,7 +763,6 @@ async fn test_unsafe_authority_labels(
             &metrics::EndpointLabels::Inbound(metrics::InboundEndpointLabels {
                 tls: Target::meshed_http1().1,
                 authority: expected_authority,
-                target_addr: "127.0.0.1:80".parse().unwrap(),
                 policy: metrics::RouteAuthzLabels {
                     route: metrics::RouteLabels {
                         server: metrics::ServerLabel(

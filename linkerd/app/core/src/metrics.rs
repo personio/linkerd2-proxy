@@ -18,7 +18,6 @@ use linkerd_proxy_server_policy as policy;
 use prometheus_client::encoding::{EncodeLabelSet, EncodeLabelValue};
 use std::{
     fmt::{self, Write},
-    net::SocketAddr,
     sync::Arc,
     time::Duration,
 };
@@ -67,7 +66,6 @@ pub enum EndpointLabels {
 pub struct InboundEndpointLabels {
     pub tls: tls::ConditionalServerTls,
     pub authority: Option<http::uri::Authority>,
-    pub target_addr: SocketAddr,
     pub policy: RouteAuthzLabels,
 }
 
@@ -102,7 +100,6 @@ pub struct OutboundEndpointLabels {
     pub authority: Option<http::uri::Authority>,
     pub labels: Option<String>,
     pub zone_locality: OutboundZoneLocality,
-    pub target_addr: SocketAddr,
 }
 
 #[derive(Debug, Copy, Clone, Default, Hash, Eq, PartialEq, EncodeLabelValue)]
@@ -158,6 +155,23 @@ where
     let mut out = format!("{}_{}=\"{}\"", prefix, k0, v0);
 
     for (k, v) in labels_iter {
+        write!(out, ",{}_{}=\"{}\"", prefix, k, v).expect("label concat must succeed");
+    }
+    Some(out)
+}
+
+pub fn prefix_outbound_endpoint_labels<'i, I>(prefix: &str, mut labels_iter: I) -> Option<String>
+where
+    I: Iterator<Item = (&'i String, &'i String)>,
+{
+    let (k0, v0) = labels_iter.next()?;
+    let mut out = format!("{}_{}=\"{}\"", prefix, k0, v0);
+
+    for (k, v) in labels_iter {
+        if k == "pod" || k == "pod_template_hash" || k == "zone" {
+            continue;
+        }
+
         write!(out, ",{}_{}=\"{}\"", prefix, k, v).expect("label concat must succeed");
     }
     Some(out)
@@ -322,11 +336,7 @@ impl FmtLabels for InboundEndpointLabels {
             write!(f, ",")?;
         }
 
-        (
-            (TargetAddr(self.target_addr), TlsAccept::from(&self.tls)),
-            &self.policy,
-        )
-            .fmt_labels(f)?;
+        ((TlsAccept::from(&self.tls)), &self.policy).fmt_labels(f)?;
 
         Ok(())
     }
@@ -414,9 +424,8 @@ impl FmtLabels for OutboundEndpointLabels {
             write!(f, ",")?;
         }
 
-        let ta = TargetAddr(self.target_addr);
         let tls = TlsConnect::from(&self.server_id);
-        (ta, tls).fmt_labels(f)?;
+        (tls).fmt_labels(f)?;
 
         if let Some(labels) = self.labels.as_ref() {
             write!(f, ",{}", labels)?;
